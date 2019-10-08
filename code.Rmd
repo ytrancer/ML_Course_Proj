@@ -1,0 +1,137 @@
+---
+title: "Human Activity Recognition: Analysis with Machine Learning"
+author: "Taras Poltorak"
+date: "25/09/2019"
+output: html_document
+---
+## Background
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, the goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(caret)
+library(rsample)
+library(yardstick)
+library(rpart.plot)
+
+
+```
+
+## Getting the data
+
+We'll check if the data already exists locally and, if not, we download it.
+
+```{r}
+
+# Get the training data
+
+train_fileurl <- 'https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv'
+
+if (!file.exists('pml-training.csv')){
+  download.file(train_fileurl,'./pml_training.csv')
+  
+}
+
+train_df <- read.csv("pml_training.csv", na.strings=c("NA","#DIV/0!", ""))
+
+# Get the test data
+
+test_fileurl <- 'https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv'
+
+if (!file.exists('pml-testing.csv')){
+  download.file(train_fileurl,'./pml_testing.csv')
+  
+}
+
+test_df <- read.csv("pml_testing.csv", na.strings=c("NA","#DIV/0!", ""))
+
+```
+
+## EDA and Data Cleaning
+
+```{r}
+glimpse(train_df)
+
+ggplot(train_df, aes(x = classe)) + geom_density()
+
+```
+
+There are way too many NAs in the data set.  If we want any meaningful results we'll have to do something about them.  In this instance, I am getting rid of the variables, which contain all NAs. Also, 1st to 7th variables are irrelevant for this exersise, so we'll delete them. There are also quite a few near-zero values, which we are getting rid of.
+
+```{r}
+train_df <- train_df[,colSums(is.na(train_df)) == 0]
+train_df <- train_df[,-c(1:7)]
+
+test_df <- test_df[,colSums(is.na(test_df)) == 0]
+test_df <- test_df[,-c(1:7)]
+
+near_zero <- nearZeroVar(train_df, saveMetrics = TRUE)
+
+train_df <- train_df[, !near_zero$nzv]
+test_df <- test_df[, !near_zero$nzv]
+```
+
+## Pre-processing
+
+Now we are going to partition the **train_df** into the training and validation parts.
+
+```{r}
+
+test_split <- train_df %>% 
+    initial_split(prop = 0.7, strata = "classe")
+
+data_training <- training(test_split)
+data_testing <- testing(test_split)
+```
+
+## Now let's fit some models.
+
+```{r}
+
+# Decision Tree
+
+fit_decTree <- rpart(classe ~ ., 
+                     data = data_training, 
+                     method = "class")
+                     
+rpart.plot(fit_decTree)                    
+
+```
+
+```{r}
+
+# Random Forest
+
+fit_RF <- train(classe ~ ., 
+                 data = data_training, 
+                 method = "rf", 
+                 trControl = trainControl(method = "cv", 5), 
+                 ntree = 250)
+```
+
+Let's have a look at the results
+
+
+```{r}
+
+pred_decTree <- predict(fit_decTree, data_testing, type = "class")
+confusionMatrix(pred_decTree, data_testing$classe)
+```
+
+```{r}
+
+pred_rf <- predict(fit_RF, data_testing, type = "raw")
+confusionMatrix(pred_rf, data_testing$classe)
+```
+
+Random Forest offers 0.99 accuracy against 0.74 on Decision Tree.  Therefore, we choose Random Forest. I am not aware of a meaningful way to visualise what Random Forest has learned, but we can have a look at it's accuracy.
+
+```{r}
+
+plot(fit_RF)
+
+```
