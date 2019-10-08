@@ -1,7 +1,7 @@
 ---
 title: "Human Activity Recognition: Analysis with Machine Learning"
 author: "Taras Poltorak"
-date: "25/09/2019"
+date: "08/10/2019"
 output: html_document
 ---
 ## Background
@@ -129,6 +129,14 @@ confusionMatrix(pred_rf, data_testing$classe)
 ```
 
 Random Forest offers 0.99 accuracy against 0.74 on Decision Tree.  Therefore, we choose Random Forest. I am not aware of a meaningful way to visualise what Random Forest has learned, but we can have a look at it's accuracy.
+
+```{r}
+
+fit_RF$finalModel
+
+```
+
+As we can see, the out-of-sample error is extremely small.
 
 ```{r}
 
